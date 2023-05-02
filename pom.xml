@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>org.jetlinks</groupId>
-    <artifactId>jetlinks-official-protocol</artifactId>
+    <artifactId>jetlinks-trda-protocol</artifactId>
     <version>3.0.0</version>
 
     <name>JetLinks</name>
@@ -151,7 +151,7 @@
                                         <transformer
                                                 implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                                             <!-- 设置主类  -->
-                                            <mainClass>org.jetlinks.protocol.official.tcp.TcpDeviceMessageCodec</mainClass>
+                                            <mainClass>org.jetlinks.protocol.trda.tcp.TcpDeviceMessageCodec</mainClass>
                                         </transformer>
                                     </transformers>
 <!--                                    <artifactSet>-->
