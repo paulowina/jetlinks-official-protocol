@@ -1,7 +1,9 @@
 package org.jetlinks.protocol.trda;
 
+import com.alibaba.fastjson.JSONObject;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.SneakyThrows;
+import lombok.extern.slf4j.Slf4j;
 import org.hswebframework.web.bean.FastBeanCopier;
 import org.jetlinks.core.message.*;
 import org.jetlinks.core.message.event.EventMessage;
@@ -13,7 +15,10 @@ import org.jetlinks.core.message.state.DeviceStateCheckMessage;
 import org.jetlinks.core.message.state.DeviceStateCheckMessageReply;
 import org.jetlinks.core.route.MqttRoute;
 import org.jetlinks.core.utils.TopicUtils;
+import org.jetlinks.protocol.trda.property.ReportPropertyTrdaMessage;
 import org.reactivestreams.Publisher;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -22,7 +27,6 @@ import java.util.Collections;
 import java.util.Optional;
 import java.util.StringJoiner;
 import java.util.function.Function;
-
 public enum TopicMessageCodec {
     //上报属性数据
     reportProperty("/*/properties/report",
@@ -33,6 +37,14 @@ public enum TopicMessageCodec {
                            .group("属性上报")
                            .description("上报物模型属性数据")
                            .example("{\"properties\":{\"属性ID\":\"属性值\"}}")),
+    reportTrdaProperty("/*/sys/property/post",
+            ReportPropertyTrdaMessage.class,
+            route -> route
+                    .upstream(true)
+                    .downstream(false)
+                    .group("属性上报")
+                    .description("上报物模型属性数据")
+                    .example("{\"properties\":{\"属性ID\":\"属性值\"}}")),
     //读取属性
     readProperty("/*/properties/read",
                  ReadPropertyMessage.class,
@@ -53,6 +65,14 @@ public enum TopicMessageCodec {
                               .example("{\"messageId\":\"消息ID,与读取指令中的ID一致.\",\"properties\":{\"属性ID\":\"属性值\"}}")),
     //修改属性
     writeProperty("/*/properties/write",
+                  WritePropertyMessage.class,
+                  route -> route
+                          .upstream(false)
+                          .downstream(true)
+                          .group("修改属性")
+                          .description("平台下发修改物模型属性数据指令")
+                          .example("{\"messageId\":\"消息ID,回复时需要一致.\",\"properties\":{\"属性ID\":\"属性值\"}}")),
+    writeTrdaProperty("/*/sys/property/set",
                   WritePropertyMessage.class,
                   route -> route
                           .upstream(false)
@@ -103,6 +123,16 @@ public enum TopicMessageCodec {
 
     //调用功能
     functionInvoke("/*/function/invoke",
+                   FunctionInvokeMessage.class,
+                   route -> route
+                           .upstream(false)
+                           .downstream(true)
+                           .group("调用功能")
+                           .description("平台下发功能调用指令")
+                           .example("{\"messageId\":\"消息ID,回复时需要一致.\"," +
+                                            "\"functionId\":\"功能标识\"," +
+                                            "\"inputs\":[{\"name\":\"参数名\",\"value\":\"参数值\"}]}")),
+    functionTrdaInvoke("/*/sys/property/set",
                    FunctionInvokeMessage.class,
                    route -> route
                            .upstream(false)
@@ -298,6 +328,7 @@ public enum TopicMessageCodec {
     private final String[] pattern;
     private final MqttRoute route;
     private final Class<? extends DeviceMessage> type;
+    private static final Logger logger = LoggerFactory.getLogger(TopicMessageCodec.class);
 
     protected void transMqttTopic(String[] topic) {
 
@@ -364,6 +395,7 @@ public enum TopicMessageCodec {
                     DeviceMessage message = mapper.readValue(payload, type);
                     FastBeanCopier.copy(Collections.singletonMap("deviceId", topic[1]), message);
 
+                    logger.warn("--debug-->doDecode payload={},topic={},message={}", new String(payload),JSONObject.toJSONString(topic),JSONObject.toJSONString(message));
                     return message;
                 });
     }
