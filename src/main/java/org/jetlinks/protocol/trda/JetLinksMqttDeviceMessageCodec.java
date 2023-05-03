@@ -157,7 +157,12 @@ public class JetLinksMqttDeviceMessageCodec implements DeviceMessageCodec {
             trdaMsg.put("method","get");
             JSONObject params = new JSONObject();
             for(String str: msg.getProperties()){
-                params.put(str,"?");
+                JSONObject childParam = formatSpecialPropertyForGet(str);
+                if(childParam!=null){
+                    params.put(str,childParam);
+                }else {
+                    params.put(str,"?");
+                }
             }
 
             trdaMsg.put("params",params);
@@ -175,6 +180,29 @@ public class JetLinksMqttDeviceMessageCodec implements DeviceMessageCodec {
         return Mono.empty();
     }
 
+    private JSONObject formatSpecialPropertyForGet(String property){
+        JSONObject childParam = new JSONObject();
+        if("installAngle".equals(property)){
+            childParam.put("x","?");
+            childParam.put("y","?");
+            childParam.put("z","?");
+            return childParam;
+        }
+
+        if("humanPosition".equals(property)){
+            childParam.put("x","?");
+            childParam.put("y","?");
+            childParam.put("z","?");
+            return childParam;
+        }
+
+        if("fallPosition".equals(property)){
+            childParam.put("x","?");
+            childParam.put("y","?");
+            return childParam;
+        }
+        return null;
+    }
     @Nonnull
     @Override
     public Flux<DeviceMessage> decode(@Nonnull MessageDecodeContext context) {
