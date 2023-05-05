@@ -132,7 +132,6 @@ public class JetLinksMqttDeviceMessageCodec implements DeviceMessageCodec {
         DeviceMessage message = (DeviceMessage)ctx.getMessage();
 
         JSONObject trdaMsg = new JSONObject();
-        trdaMsg.put("version","1.0");
 
             //设置属性
         if(message instanceof FunctionInvokeMessage){
@@ -141,6 +140,7 @@ public class JetLinksMqttDeviceMessageCodec implements DeviceMessageCodec {
 
             trdaMsg.put("method","set");
             trdaMsg.put("params",msg.inputsToMap());
+            trdaMsg.put("version","1.0");
             return Mono.just(
                     SimpleMqttMessage
                     .builder()
@@ -166,12 +166,12 @@ public class JetLinksMqttDeviceMessageCodec implements DeviceMessageCodec {
             }
 
             trdaMsg.put("params",params);
-
+            trdaMsg.put("version","1.0");
             return Mono.just(
                     SimpleMqttMessage
                             .builder()
 //                            .messageId(msg.getMessageId())
-                            .topic("/".concat(productId.get())+"/"+msg.getDeviceId()+"/sys/property/get/")
+                            .topic("/".concat(productId.get())+"/"+msg.getDeviceId()+"/sys/property/set/")
                             .payload(trdaMsg.toJSONString())
                             .build()
             );
