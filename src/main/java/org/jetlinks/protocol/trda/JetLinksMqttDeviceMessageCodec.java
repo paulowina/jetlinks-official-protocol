@@ -1,16 +1,11 @@
 package org.jetlinks.protocol.trda;
 
-import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
-import com.alibaba.fastjson.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
 import lombok.extern.slf4j.Slf4j;
 import org.jetlinks.core.device.DeviceConfigKey;
 import org.jetlinks.core.message.DeviceMessage;
-import org.jetlinks.core.message.DeviceOnlineMessage;
 import org.jetlinks.core.message.DisconnectDeviceMessage;
 import org.jetlinks.core.message.Headers;
 import org.jetlinks.core.message.Message;
@@ -18,15 +13,12 @@ import org.jetlinks.core.message.codec.*;
 import org.jetlinks.core.message.function.FunctionInvokeMessage;
 import org.jetlinks.core.message.property.ReadPropertyMessage;
 import org.jetlinks.core.message.property.ReportPropertyMessage;
-import org.jetlinks.core.server.session.DeviceSession;
-import org.jetlinks.protocol.trda.property.ReportPropertyTrdaMessage;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import javax.annotation.Nonnull;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
@@ -88,9 +80,12 @@ public class JetLinksMqttDeviceMessageCodec implements DeviceMessageCodec {
 
     @Nonnull
     public Mono<MqttMessage> encode(@Nonnull MessageEncodeContext context) {
-        log.warn("--debug-->encode context={}", JSONObject.toJSONString(context));
+//        log.warn("---debugV2-->data={}", JSONObject.toJSONString(context));
         if(1==1){
-            return myEncode(context);
+            Mono<MqttMessage> mqttMsg= myEncode(context);
+            log.warn("下发 mqttMsg={}", JSONObject.toJSONString(mqttMsg));
+
+            return mqttMsg;
         }
         return Mono.defer(() -> {
             Message message = context.getMessage();
@@ -141,14 +136,16 @@ public class JetLinksMqttDeviceMessageCodec implements DeviceMessageCodec {
             trdaMsg.put("method","set");
             trdaMsg.put("params",msg.inputsToMap());
             trdaMsg.put("version","1.0");
-            return Mono.just(
-                    SimpleMqttMessage
+
+            MqttMessage mqttMessage = SimpleMqttMessage
                     .builder()
-                    .topic("/".concat(productId.get())+"/"+msg.getDeviceId()+"/sys/property/set/")
+//                    .messageId((int)(Math.random() * 1000000))
+                    .topic("/".concat(productId.get())+"/"+msg.getDeviceId()+"/sys/property/set")
 //                  .topic("/invoke/"+msg.getMessageId())
-                    .payload(trdaMsg.toJSONString())
-                    .build()
-            );
+                    .payload(trdaMsg.toJSONString()).build();
+
+            log.warn("--debug-->invokeMessage msg={}",JSONObject.toJSONString(mqttMessage));
+            return Mono.just(mqttMessage);
             //查询属性
         }else if(message instanceof ReadPropertyMessage){
             ReadPropertyMessage msg = (ReadPropertyMessage)message;
@@ -167,14 +164,16 @@ public class JetLinksMqttDeviceMessageCodec implements DeviceMessageCodec {
 
             trdaMsg.put("params",params);
             trdaMsg.put("version","1.0");
-            return Mono.just(
-                    SimpleMqttMessage
-                            .builder()
-//                            .messageId(msg.getMessageId())
-                            .topic("/".concat(productId.get())+"/"+msg.getDeviceId()+"/sys/property/set/")
-                            .payload(trdaMsg.toJSONString())
-                            .build()
-            );
+
+            MqttMessage mqttMessage =  SimpleMqttMessage
+                    .builder()
+//                    .messageId((int)(Math.random() * 1000000))
+//                  .messageId(msg.getMessageId())
+                    .topic("/".concat(productId.get())+"/"+msg.getDeviceId()+"/sys/property/set")
+                    .payload(trdaMsg.toJSONString())
+                    .build();
+            log.warn("--debug-->readProperty msg={}",JSONObject.toJSONString(mqttMessage));
+            return Mono.just(mqttMessage);
         }
 
         return Mono.empty();
@@ -206,12 +205,13 @@ public class JetLinksMqttDeviceMessageCodec implements DeviceMessageCodec {
     @Nonnull
     @Override
     public Flux<DeviceMessage> decode(@Nonnull MessageDecodeContext context) {
-        log.warn("--debug-->decode context={}", JSONObject.toJSONString(context));
+        log.warn("decode1 context={}", JSONObject.toJSONString(context));
         MqttMessage message = (MqttMessage) context.getMessage();
         byte[] payload = message.payloadAsBytes();
 
         if(1==1){
-            return myDecode(context);
+            Flux<DeviceMessage> msg = myDecode(context);
+            return msg;
         }
         return TopicMessageCodec
                 .decode(mapper, TopicMessageCodec.removeProductPath(message.getTopic()), payload)
@@ -236,7 +236,7 @@ public class JetLinksMqttDeviceMessageCodec implements DeviceMessageCodec {
         String[] topics = TopicMessageCodec.removeProductPath(topic);
         String deviceId = topics[1];
 
-        log.warn("--debug myDecode-->trdaMessage={}",JSONObject.toJSONString(trdaMessage));
+//        log.warn("--debug myDecode-->trdaMessage={}",JSONObject.toJSONString(trdaMessage));
         log.warn("--debug myDecode-->topic={},jsonMsg={}",topic,jsonMsg.toJSONString());
 
         //上报主题
@@ -250,12 +250,26 @@ public class JetLinksMqttDeviceMessageCodec implements DeviceMessageCodec {
 
             // 设置上报属性
             propertyMessage.properties(jsonMsg.getObject("params",Map.class));
+//            log.warn("--debug-->readPost data={}",JSONObject.toJSONString(propertyMessage));
             return Flux.just(propertyMessage);
+        }
+        String opt = jsonMsg.getString("opt");
+        String res = jsonMsg.getString("res");
+        //查询属性
+        if("get".equals(opt)){
+            if(!"success".equals(res)){
+                log.error("属性查询失败");
+                return Flux.empty();
+            }
 
-        }else if("get".equals(method)){
-
-        }else if("set".equals(method)){
-
+            long time= LocalDateTime.now().toInstant(ZoneOffset.of("+8")).toEpochMilli();
+            ReportPropertyMessage propertyMessage = new ReportPropertyMessage();
+            propertyMessage.setDeviceId(deviceId);
+            propertyMessage.setTimestamp(time);
+            //设置超时时间（可选,默认10分钟），如果超过这个时间没有收到任何消息则认为离线。
+            propertyMessage.addHeader(Headers.keepOnlineTimeoutSeconds,600);
+            propertyMessage.properties(jsonMsg.getObject("params",Map.class));
+            return Flux.just(propertyMessage);
         }
 
         return Flux.empty();

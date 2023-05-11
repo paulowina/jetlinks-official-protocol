@@ -30,7 +30,7 @@ public class JetLinksAuthenticator implements Authenticator {
             // md5(secureId|timestamp|secureKey)
             String password = mqtt.getPassword();
 
-            log.warn("--debug-->mqtt authenticate,username={},password={}",username,password);
+//            log.warn("--debug-->mqtt authenticate,username={},password={}",username,password);
             if(1==1){
                 return Mono.just(AuthenticationResponse.success(deviceOperation.getDeviceId()));
             }

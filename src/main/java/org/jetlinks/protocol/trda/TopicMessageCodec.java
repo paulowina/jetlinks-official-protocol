@@ -395,7 +395,7 @@ public enum TopicMessageCodec {
                     DeviceMessage message = mapper.readValue(payload, type);
                     FastBeanCopier.copy(Collections.singletonMap("deviceId", topic[1]), message);
 
-                    logger.warn("--debug-->doDecode payload={},topic={},message={}", new String(payload),JSONObject.toJSONString(topic),JSONObject.toJSONString(message));
+//                    logger.warn("--debug-->doDecode payload={},topic={},message={}", new String(payload),JSONObject.toJSONString(topic),JSONObject.toJSONString(message));
                     return message;
                 });
     }
